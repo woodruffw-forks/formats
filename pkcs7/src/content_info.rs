@@ -1,4 +1,6 @@
 use crate::{data_content::DataContent, encrypted_data_content::EncryptedDataContent, ContentType};
+#[cfg(feature = "alloc")]
+use crate::signed_data_content::SignedDataContent;
 
 use der::{
     asn1::{ContextSpecific, OctetStringRef},
@@ -22,6 +24,10 @@ pub enum ContentInfo<'a> {
     /// Content type `encrypted-data`
     EncryptedData(Option<EncryptedDataContent<'a>>),
 
+    /// Content type `signed-data`
+    #[cfg(feature = "alloc")]
+    SignedData(Option<SignedDataContent<'a>>),
+
     /// Catch-all case for content types that are not explicitly supported
     ///   - signed-data
     ///   - enveloped-data
@@ -36,6 +42,8 @@ impl<'a> ContentInfo<'a> {
         match self {
             Self::Data(_) => ContentType::Data,
             Self::EncryptedData(_) => ContentType::EncryptedData,
+            #[cfg(feature = "alloc")]
+            Self::SignedData(_) => ContentType::SignedData,
             Self::Other((content_type, _)) => *content_type,
         }
     }
@@ -108,6 +116,16 @@ impl<'a> Sequence<'a> for ContentInfo<'a> {
                     value: *d,
                 }),
             ]),
+            #[cfg(feature = "alloc")]
+            Self::SignedData(_data) => todo!(),
+            // Self::SignedData(data) => f(&[
+            //     &self.content_type(),
+            //     &data.as_ref().map(|d| ContextSpecific {
+            //         tag_number: CONTENT_TAG,
+            //         tag_mode: TagMode::Explicit,
+            //         value: *d,
+            //     }),
+            // ]),
             Self::Other((content_type, opt_oct_str)) => f(&[
                 content_type,
                 &opt_oct_str.as_ref().map(|d| ContextSpecific {

@@ -16,6 +16,8 @@ pub use crate::{content_info::ContentInfo, content_type::ContentType};
 pub mod data_content;
 pub mod encrypted_data_content;
 pub mod enveloped_data_content;
+#[cfg(feature = "alloc")]
+pub mod signed_data_content;
 
 use der::asn1::ObjectIdentifier;
 

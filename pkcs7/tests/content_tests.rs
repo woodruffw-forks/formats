@@ -1,5 +1,7 @@
 //! PKCS#7 example tests
 
+use std::fs;
+
 use der::{
     asn1::{ObjectIdentifier, OctetStringRef},
     Decode, SliceWriter,
@@ -10,7 +12,6 @@ use pkcs7::{
     ContentInfo, ContentType,
 };
 use spki::AlgorithmIdentifierRef;
-use std::fs;
 
 fn encode_content_info<'a>(content_info: &ContentInfo<'a>, buf: &'a mut [u8]) -> &'a [u8] {
     let mut encoder = SliceWriter::new(buf);

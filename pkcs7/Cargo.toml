@@ -21,6 +21,10 @@ spki = { version = "=0.7.0-pre", path = "../spki" }
 [dev-dependencies]
 hex-literal = "0.3"
 
+[features]
+alloc = ["der/alloc"]
+std = ["alloc"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
