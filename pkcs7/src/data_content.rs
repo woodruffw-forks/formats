@@ -1,6 +1,7 @@
 //! `data` content type [RFC 5652 § 4](https://datatracker.ietf.org/doc/html/rfc5652#section-4)
 
 use core::convert::{From, TryFrom};
+
 use der::{
     asn1::OctetStringRef, DecodeValue, EncodeValue, FixedTag, Header, Length, Reader, Tag, Writer,
 };

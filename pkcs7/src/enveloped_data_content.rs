@@ -1,12 +1,12 @@
 //! `enveloped-data` content type [RFC 5652 § 6](https://datatracker.ietf.org/doc/html/rfc5652#section-6)
 
-use crate::ContentType;
-
 use der::{
     asn1::{ContextSpecific, OctetStringRef},
     DecodeValue, Encode, Header, Reader, Sequence, TagMode, TagNumber,
 };
 use spki::AlgorithmIdentifierRef;
+
+use crate::ContentType;
 
 type ContentEncryptionAlgorithmIdentifier<'a> = AlgorithmIdentifierRef<'a>;
 

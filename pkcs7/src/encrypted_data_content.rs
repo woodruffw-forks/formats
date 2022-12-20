@@ -1,9 +1,10 @@
 //! `encrypted-data` content type [RFC 5652 § 8](https://datatracker.ietf.org/doc/html/rfc5652#section-8)
 
-use crate::enveloped_data_content::EncryptedContentInfo;
 use der::{
     DecodeValue, Encode, EncodeValue, FixedTag, Header, Length, Reader, Sequence, Tag, Writer,
 };
+
+use crate::enveloped_data_content::EncryptedContentInfo;
 
 /// Syntax version of the `encrypted-data` content type.
 ///

@@ -2,12 +2,11 @@
 
 use der::{
     asn1::{OctetStringRef, SetOfVec},
-    Decode, DecodeValue, Encode, EncodeValue, FixedTag, Header, Length, Reader, Sequence, Tag,
-    TagNumber, Writer,
+    AnyRef, Choice, DecodeValue, Encode, EncodeValue, FixedTag, Header, Length, Reader, Sequence,
+    Tag, TagNumber, ValueOrd, Writer,
 };
 use spki::{AlgorithmIdentifierRef, ObjectIdentifier};
-
-const CONTENT_TAG: TagNumber = TagNumber::new(0);
+use x509_cert::certificate::Certificate;
 
 /// Syntax version of the `signed-data` content type.
 ///
@@ -79,39 +78,6 @@ type DigestAlgorithmIdentifier<'a> = AlgorithmIdentifierRef<'a>;
 
 type ContentType = ObjectIdentifier;
 
-/// PKCS #7 defines `content` as:
-///
-/// ```asn1
-/// content [0] EXPLICIT ANY DEFINED BY contentType OPTIONAL
-/// ```
-///
-/// The CMS defines `eContent` as:
-///
-/// ```asn1
-/// eContent [0] EXPLICIT OCTET STRING OPTIONAL
-/// ```
-///
-/// RFC 5652 allows for both, with the former explicitly for backwards compatibility.
-///
-/// See [RFC 5652 § 5.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.2.1).
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Content<'a> {
-    /// The `EXPLICIT OCTET STRING` form.
-    OctetString(Option<OctetStringRef<'a>>),
-
-    /// The `EXPLICIT ANY DEFINED BY contentType` form.
-    Custom(Option<&'a [u8]>),
-}
-
-impl<'a> Decode<'a> for Content<'a> {
-    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
-        match decoder.peek_tag()? {
-            Tag::OctetString => unimplemented!(),
-            _ => unimplemented!(),
-        }
-    }
-}
-
 /// ```asn1
 /// EncapsulatedContentInfo ::= SEQUENCE {
 ///   eContentType ContentType,
@@ -119,31 +85,34 @@ impl<'a> Decode<'a> for Content<'a> {
 ///
 /// ContentType ::= OBJECT IDENTIFIER
 /// ```
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Sequence)]
 pub struct EncapsulatedContentInfo<'a> {
     /// the content type for `content`.
     pub content_type: ContentType,
 
+    // NOTE: This allows for both the `eContent [0] EXPLICIT OCTET STRING` form,
+    // as well as the `content [0] EXPLICIT ANY DEFINED BY contentType` form,
+    // as permitted in RFC 5652 § 5.2.1.
     /// the content itself.
-    pub content: Content<'a>,
+    #[asn1(context_specific = "0", tag_mode = "EXPLICIT", optional = "true")]
+    pub content: Option<AnyRef<'a>>,
 }
 
-impl FixedTag for EncapsulatedContentInfo<'_> {
-    const TAG: Tag = Tag::Sequence;
-}
-
-impl<'a> DecodeValue<'a> for EncapsulatedContentInfo<'a> {
-    fn decode_value<R: Reader<'a>>(
-        reader: &mut R,
-        header: Header,
-    ) -> der::Result<EncapsulatedContentInfo<'a>> {
-        reader.read_nested(header.length, |reader| {
-            Ok(EncapsulatedContentInfo {
-                content_type: reader.decode()?,
-                content: reader.decode()?,
-            })
-        })
-    }
+/// ```asn1
+/// CertificateChoices ::= CHOICE {
+///   certificate Certificate,
+///   extendedCertificate [0] IMPLICIT ExtendedCertificate, -- Obsolete
+///   v1AttrCert [1] IMPLICIT AttributeCertificateV1,       -- Obsolete
+///   v2AttrCert [2] IMPLICIT AttributeCertificateV2,
+///   other [3] IMPLICIT OtherCertificateFormat }
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq, Choice, ValueOrd)]
+pub enum CertificateChoices<'a> {
+    Certificate(Certificate<'a>),
+    // ExtendedCertificate,
+    // V1AttrCert,
+    // V2AttrCert,
+    // Other,
 }
 
 /// Signed-data content type [RFC 5652 § 5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
@@ -170,7 +139,7 @@ impl<'a> DecodeValue<'a> for EncapsulatedContentInfo<'a> {
 ///     of digest algorithm identifiers
 ///   - [`encapsulated_content_info`](SignedDataContent::encapsulated_content_info)
 ///     is the encapsulated signed content
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Sequence)]
 pub struct SignedDataContent<'a> {
     /// the syntax version number.
     pub version: Version,
@@ -180,33 +149,11 @@ pub struct SignedDataContent<'a> {
 
     /// the signed content.
     pub encapsulated_content_info: EncapsulatedContentInfo<'a>,
-    // TODO: certificates, crls, signed_infos
-}
 
-impl<'a> DecodeValue<'a> for SignedDataContent<'a> {
-    fn decode_value<R: Reader<'a>>(
-        reader: &mut R,
-        header: Header,
-    ) -> der::Result<SignedDataContent<'a>> {
-        reader.read_nested(header.length, |reader| {
-            Ok(SignedDataContent {
-                version: reader.decode()?,
-                digest_algorithms: reader.decode()?,
-                encapsulated_content_info: reader.decode()?,
-            })
-        })
-    }
-}
+    #[asn1(context_specific = "0", tag_mode = "IMPLICIT", optional = "true")]
+    pub certificates: Option<SetOfVec<CertificateChoices<'a>>>,
+    // #[asn1(context_specific = "1", tag_mode = "IMPLICIT", optional = "true")]
+    // pub crls: (),
 
-// impl<'a> Sequence<'a> for SignedDataContent<'a> {
-//     fn fields<F, T>(&self, f: F) -> der::Result<T>
-//     where
-//         F: FnOnce(&[&dyn Encode]) -> der::Result<T>,
-//     {
-//         f(&[
-//             &self.version,
-//             &self.digest_algorithms,
-//             &self.encapsulated_content_info,
-//         ])
-//     }
-// }
+    // pub signer_infos: (),
+}

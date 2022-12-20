@@ -1,11 +1,11 @@
-use crate::{data_content::DataContent, encrypted_data_content::EncryptedDataContent, ContentType};
-#[cfg(feature = "alloc")]
-use crate::signed_data_content::SignedDataContent;
-
 use der::{
     asn1::{ContextSpecific, OctetStringRef},
     DecodeValue, Encode, Header, Reader, Sequence, TagMode, TagNumber,
 };
+
+#[cfg(feature = "signed-data")]
+use crate::signed_data_content::SignedDataContent;
+use crate::{data_content::DataContent, encrypted_data_content::EncryptedDataContent, ContentType};
 
 const CONTENT_TAG: TagNumber = TagNumber::new(0);
 
@@ -25,7 +25,7 @@ pub enum ContentInfo<'a> {
     EncryptedData(Option<EncryptedDataContent<'a>>),
 
     /// Content type `signed-data`
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "signed-data")]
     SignedData(Option<SignedDataContent<'a>>),
 
     /// Catch-all case for content types that are not explicitly supported
@@ -42,7 +42,7 @@ impl<'a> ContentInfo<'a> {
         match self {
             Self::Data(_) => ContentType::Data,
             Self::EncryptedData(_) => ContentType::EncryptedData,
-            #[cfg(feature = "alloc")]
+            #[cfg(feature = "signed-data")]
             Self::SignedData(_) => ContentType::SignedData,
             Self::Other((content_type, _)) => *content_type,
         }
@@ -84,6 +84,9 @@ impl<'a> DecodeValue<'a> for ContentInfo<'a> {
                 ContentType::EncryptedData => Ok(ContentInfo::EncryptedData(
                     reader.context_specific(CONTENT_TAG, TagMode::Explicit)?,
                 )),
+                ContentType::SignedData => Ok(ContentInfo::SignedData(
+                    reader.context_specific(CONTENT_TAG, TagMode::Explicit)?,
+                )),
                 _ => Ok(ContentInfo::Other((
                     content_type,
                     reader
@@ -116,16 +119,15 @@ impl<'a> Sequence<'a> for ContentInfo<'a> {
                     value: *d,
                 }),
             ]),
-            #[cfg(feature = "alloc")]
-            Self::SignedData(_data) => todo!(),
-            // Self::SignedData(data) => f(&[
-            //     &self.content_type(),
-            //     &data.as_ref().map(|d| ContextSpecific {
-            //         tag_number: CONTENT_TAG,
-            //         tag_mode: TagMode::Explicit,
-            //         value: *d,
-            //     }),
-            // ]),
+            #[cfg(feature = "signed-data")]
+            Self::SignedData(data) => f(&[
+                &self.content_type(),
+                &data.as_ref().map(|d| ContextSpecific {
+                    tag_number: CONTENT_TAG,
+                    tag_mode: TagMode::Explicit,
+                    value: d.clone(),
+                }),
+            ]),
             Self::Other((content_type, opt_oct_str)) => f(&[
                 content_type,
                 &opt_oct_str.as_ref().map(|d| ContextSpecific {
@@ -140,9 +142,11 @@ impl<'a> Sequence<'a> for ContentInfo<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ContentInfo, DataContent};
     use core::convert::TryFrom;
+
     use der::{asn1::OctetStringRef, Decode, Encode, Length, SliceWriter, TagMode, TagNumber};
+
+    use super::{ContentInfo, DataContent};
 
     #[test]
     fn empty_data() -> der::Result<()> {

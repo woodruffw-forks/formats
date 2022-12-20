@@ -15,8 +15,9 @@ edition = "2021"
 rust-version = "1.65"
 
 [dependencies]
-der = { version = "=0.7.0-pre", features = ["oid"], path = "../der" }
+der = { version = "=0.7.0-pre", features = ["oid", "derive"], path = "../der" }
 spki = { version = "=0.7.0-pre", path = "../spki" }
+x509-cert = { version = "=0.2.0-pre", path = "../x509-cert", optional = true }
 
 [dev-dependencies]
 hex-literal = "0.3"
@@ -24,6 +25,7 @@ hex-literal = "0.3"
 [features]
 alloc = ["der/alloc"]
 std = ["alloc"]
+signed-data = ["alloc", "dep:x509-cert"]
 
 [package.metadata.docs.rs]
 all-features = true
